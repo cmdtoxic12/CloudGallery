@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Gallery — CloudGalary</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container navbar-inner">
+      <a href="dashboard.html" class="logo">
+        <i class="fas fa-cloud" style="color:var(--primary)"></i>
+        Cloud<span>Galary</span>
+      </a>
+      <div class="nav-actions">
+        <a href="dashboard.html" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main-content" style="max-width:640px;margin:0 auto;padding:2rem 1.25rem">
+    <h1 class="mb-3">Create New Gallery</h1>
+
+    <form id="createForm" class="create-form">
+      <div class="form-group">
+        <label for="name">Event Name *</label>
+        <input type="text" id="name" class="form-control" placeholder="John & Mary's Wedding" required>
+      </div>
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" class="form-control" placeholder="Wedding ceremony and reception photos..."></textarea>
+      </div>
+      <div class="form-group">
+        <label for="event_date">Event Date</label>
+        <input type="date" id="event_date" class="form-control">
+      </div>
+      <div class="form-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" class="form-control" placeholder="Accra, Ghana">
+      </div>
+      <div class="form-group">
+        <label>Gallery Visibility</label>
+        <div class="radio-group">
+          <label class="radio-option selected">
+            <input type="radio" name="visibility" value="public" checked>
+            <div>
+              <strong>🌍 Public</strong>
+              <div class="text-muted" style="font-size:0.85rem">Anyone with the link can view</div>
+            </div>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="visibility" value="private">
+            <div>
+              <strong>🔒 Private</strong>
+              <div class="text-muted" style="font-size:0.85rem">Only you can view</div>
+            </div>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="visibility" value="password">
+            <div>
+              <strong>🔑 Password Protected</strong>
+              <div class="text-muted" style="font-size:0.85rem">Requires a password to view</div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="form-group hidden" id="passwordGroup">
+        <label for="password">Gallery Password</label>
+        <input type="password" id="password" class="form-control" placeholder="Min 4 characters" minlength="4">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%">
+        <i class="fas fa-plus"></i> Create Gallery
+      </button>
+    </form>
+  </main>
+
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    if (!utils.requireAuth()) {}
+
+    // Radio selection UI
+    document.querySelectorAll('.radio-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        const val = opt.querySelector('input').value;
+        document.getElementById('passwordGroup').classList.toggle('hidden', val !== 'password');
+      });
+    });
+
+    document.getElementById('createForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Creating...';
+
+      const body = {
+        name: document.getElementById('name').value.trim(),
+        description: document.getElementById('description').value.trim(),
+        location: document.getElementById('location').value.trim(),
+        event_date: document.getElementById('event_date').value || null,
+        visibility: document.querySelector('input[name="visibility"]:checked').value,
+        password: document.getElementById('password').value || undefined,
+      };
+
+      try {
+        const res = await api.createGallery(body);
+        utils.showToast('Gallery created!', 'success');
+        setTimeout(() => {
+          window.location.href = `gallery.html?id=${res.data.gallery.id}`;
+        }, 600);
+      } catch (err) {
+        utils.showToast(err.message || 'Failed to create gallery', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-plus"></i> Create Gallery';
+      }
+    });
+  </script>
+</body>
+</html>

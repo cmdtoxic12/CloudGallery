@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery — CloudGalary</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/gallery.css">
+  <link rel="stylesheet" href="css/modal.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container navbar-inner">
+      <a href="dashboard.html" class="logo">
+        <i class="fas fa-cloud" style="color:var(--primary)"></i>
+        Cloud<span>Galary</span>
+      </a>
+      <div class="nav-actions">
+        <button class="btn btn-ghost btn-icon" data-theme-toggle title="Toggle theme">
+          <i class="fas fa-moon"></i>
+        </button>
+        <a href="dashboard.html" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Dashboard</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container" style="padding:2rem 1.25rem" id="galleryMain">
+    <div id="galleryHeader" class="gallery-header">
+      <div class="spinner" style="margin:2rem auto"></div>
+    </div>
+    <div id="photoGrid" class="photo-grid"></div>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" onclick="closeLightbox()"><i class="fas fa-times"></i></button>
+    <button class="lightbox-nav prev" onclick="navLightbox(-1)"><i class="fas fa-chevron-left"></i></button>
+    <button class="lightbox-nav next" onclick="navLightbox(1)"><i class="fas fa-chevron-right"></i></button>
+    <div class="lightbox-content">
+      <img id="lightboxImg" src="" alt="Photo">
+    </div>
+    <div class="lightbox-toolbar">
+      <button onclick="downloadPhoto(photos[currentPhotoIndex]?.id, photos[currentPhotoIndex]?.image_url)" title="Download">
+        <i class="fas fa-download"></i>
+      </button>
+      <button onclick="toggleFav(photos[currentPhotoIndex]?.id, this)" title="Favorite">
+        <i class="fas fa-heart"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Share Modal -->
+  <div class="modal-overlay" id="shareModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Share Gallery</h2>
+        <button class="modal-close" onclick="modal.close('shareModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-2">Share this link with guests so they can view all photos:</p>
+        <div class="share-box">
+          <input type="text" id="shareLinkInput" readonly>
+          <button class="btn btn-sm btn-primary" onclick="copyShareLink()">Copy</button>
+        </div>
+        <div class="flex gap-1 mt-2" style="flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="shareWhatsApp()">
+            <i class="fab fa-whatsapp" style="color:#25D366"></i> WhatsApp
+          </button>
+          <button class="btn btn-secondary" onclick="shareNative()">
+            <i class="fas fa-share"></i> Share
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/upload.js"></script>
+  <script src="js/gallery.js"></script>
+</body>
+</html>

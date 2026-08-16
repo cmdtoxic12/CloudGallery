@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — CloudGalary</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container navbar-inner">
+      <a href="dashboard.html" class="logo">
+        <i class="fas fa-cloud" style="color:var(--primary)"></i>
+        Cloud<span>Galary</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="dashboard.html" class="active">Dashboard</a></li>
+        <li><a href="create-gallery.html">Create</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="btn btn-ghost btn-icon" data-theme-toggle title="Toggle theme">
+          <i class="fas fa-moon"></i>
+        </button>
+        <a href="#" class="btn btn-ghost btn-sm" data-logout>
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="dashboard-layout">
+    <aside class="sidebar">
+      <ul class="sidebar-nav">
+        <li><a href="dashboard.html" class="active"><i class="fas fa-th-large"></i> Overview</a></li>
+        <li><a href="create-gallery.html"><i class="fas fa-plus-circle"></i> New Gallery</a></li>
+        <li><a href="dashboard.html"><i class="fas fa-images"></i> My Galleries</a></li>
+        <li><a href="#" data-logout><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <div>
+          <h1>Welcome back, <span id="welcomeName">User</span> 👋</h1>
+          <p class="text-muted">Here's an overview of your galleries</p>
+        </div>
+        <a href="create-gallery.html" class="btn btn-primary">
+          <i class="fas fa-plus"></i> Create Gallery
+        </a>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon purple"><i class="fas fa-folder"></i></div>
+          <div class="stat-info">
+            <h3 id="statGalleries">—</h3>
+            <p>Total Galleries</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon pink"><i class="fas fa-image"></i></div>
+          <div class="stat-info">
+            <h3 id="statPhotos">—</h3>
+            <p>Total Photos</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="fas fa-eye"></i></div>
+          <div class="stat-info">
+            <h3 id="statViews">—</h3>
+            <p>Total Views</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><i class="fas fa-hdd"></i></div>
+          <div class="stat-info">
+            <h3 id="statStorage">—</h3>
+            <p>Storage Used</p>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="mb-2" style="font-size:1.25rem">My Galleries</h2>
+      <div id="galleriesGrid" class="galleries-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="spinner" style="margin:0 auto 1rem"></div>
+          <p>Loading galleries...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <nav class="mobile-nav">
+    <a href="dashboard.html" class="active"><i class="fas fa-home"></i> Home</a>
+    <a href="create-gallery.html"><i class="fas fa-plus"></i> Create</a>
+    <a href="#" data-logout><i class="fas fa-sign-out-alt"></i> Logout</a>
+  </nav>
+
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

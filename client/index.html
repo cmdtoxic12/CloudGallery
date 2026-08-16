@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudGalary — Event Photo Gallery & Sharing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container navbar-inner">
+      <a href="index.html" class="logo">
+        <i class="fas fa-cloud" style="color:var(--primary)"></i>
+        Cloud<span>Galary</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="login.html">Login</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="btn btn-ghost btn-icon" data-theme-toggle title="Toggle theme">
+          <i class="fas fa-moon"></i>
+        </button>
+        <a href="register.html" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Upload Once. Share One Link.<br><span>Everyone Views.</span></h1>
+      <p>
+        The modern cloud photo gallery for events. Stop sending hundreds of compressed
+        pictures through WhatsApp. Upload high-quality photos and share a single beautiful gallery link.
+      </p>
+      <div class="hero-actions">
+        <a href="register.html" class="btn btn-primary">
+          <i class="fas fa-rocket"></i> Start Free
+        </a>
+        <a href="#features" class="btn btn-secondary">
+          <i class="fas fa-play"></i> See How It Works
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="container">
+      <h2 class="text-center mb-3" style="font-size:1.75rem">Everything you need for event photos</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <h3>Cloud Upload</h3>
+          <p>Upload high-quality JPG, PNG, WebP photos. Drag & drop multiple files with progress tracking.</p>
+        </div>
+        <div class="feature-card">
+          <i class="fas fa-link"></i>
+          <h3>Shareable Links</h3>
+          <p>One unique gallery link for guests. Share via WhatsApp, email, or any messenger.</p>
+        </div>
+        <div class="feature-card">
+          <i class="fas fa-lock"></i>
+          <h3>Privacy Controls</h3>
+          <p>Public, private, or password-protected galleries. You control who sees your photos.</p>
+        </div>
+        <div class="feature-card">
+          <i class="fas fa-mobile-alt"></i>
+          <h3>Mobile Friendly</h3>
+          <p>Beautiful responsive galleries that look great on phones, tablets, and desktops.</p>
+        </div>
+        <div class="feature-card">
+          <i class="fas fa-download"></i>
+          <h3>Easy Downloads</h3>
+          <p>Guests can download individual photos or the entire gallery with one click.</p>
+        </div>
+        <div class="feature-card">
+          <i class="fas fa-heart"></i>
+          <h3>Favorites & Stats</h3>
+          <p>Favorite photos, track views, downloads, and shares with simple analytics.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <p>© 2026 CloudGalary · Built for photographers, event organizers & families</p>
+    </div>
+  </footer>
+
+  <script src="js/utils.js"></script>
+  <script>
+    document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => utils.toggleTheme());
+    });
+  </script>
+</body>
+</html>
