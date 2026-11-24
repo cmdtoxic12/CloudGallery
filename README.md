@@ -1,247 +1,101 @@
-# ☁️ CloudGalary — Cloud Event Photo Gallery & Sharing Platform
+# ☁️ CloudGallery v2.1 — Modern Event Photo Gallery
 
-A modern cloud-based photo gallery platform where users can upload, organize, preserve, view, and share high-quality event photographs through simple links.
+React + Vite + Tailwind CSS + TypeScript frontend with Express + PostgreSQL + Cloudinary backend.
 
 **Upload Once → Store Safely → Share One Link → Everyone Views**
 
----
+## ✨ Features (v2.1)
 
-## ✨ Features
+### Core
+- User authentication (Register / Login / JWT)
+- Create event galleries (Public / Private / Password-protected)
+- Multi-photo upload with drag & drop + progress
+- Cloudinary storage + automatic thumbnails
+- Responsive photo grid + full lightbox (keyboard nav)
+- Shareable gallery links
+- Favorites, view/download tracking
+- Dark / Light theme
+- Dashboard with storage & stats
 
-- ✅ User authentication (Register / Login / JWT)
-- ✅ Create event galleries (Public / Private / Password-protected)
-- ✅ Multi-photo upload with drag & drop + progress
-- ✅ Cloudinary cloud image storage + automatic thumbnails
-- ✅ Beautiful responsive photo grid + lightbox viewer
-- ✅ Shareable gallery links + WhatsApp share
-- ✅ Favorites, download tracking, view analytics
-- ✅ Dark / Light theme
-- ✅ Mobile-first responsive UI
-- ✅ Dashboard with storage & stats
-
----
+### New in v2.1
+- **Bulk ZIP download** — download selected photos or entire gallery as ZIP
+- **Soft delete + Trash** — recover photos or permanently purge
+- **Permanent Cloudinary cleanup** — gallery delete and purge remove assets from Cloudinary
+- **Email verification** — token-based (SMTP or console log in dev)
+- **Password reset** — forgot password + secure reset link
+- **Edit gallery** — update name, description, location, date, visibility, password
+- **Bulk select** — trash, restore, purge, or download multiple photos
 
 ## 🛠 Tech Stack
 
-| Layer        | Technology                          |
-|--------------|-------------------------------------|
-| Frontend     | HTML5, CSS3, Vanilla JavaScript     |
-| Backend      | Node.js + Express.js                |
-| Database     | PostgreSQL (or Supabase)            |
-| Storage      | Cloudinary                          |
-| Auth         | JWT + bcrypt                        |
-| Deployment   | Render / Railway (API) + any static host |
+| Layer      | Technology |
+|------------|------------|
+| Frontend   | React 19, Vite, TypeScript, Tailwind CSS, TanStack Query, Zustand |
+| Backend    | Node.js + Express.js |
+| Database   | PostgreSQL (Supabase / Neon / local) |
+| Storage    | Cloudinary |
+| Auth       | JWT + bcrypt |
+| Email      | Nodemailer (SMTP optional) |
+| ZIP        | archiver |
 
----
-
-## 📁 Project Structure
-
-```
-cloudgalary/
-├── client/                 # Frontend (static)
-│   ├── index.html
-│   ├── login.html
-│   ├── register.html
-│   ├── dashboard.html
-│   ├── create-gallery.html
-│   ├── gallery.html
-│   ├── css/
-│   └── js/
-├── server/                 # Backend API
-│   ├── server.js
-│   ├── config/
-│   ├── controllers/
-│   ├── middleware/
-│   ├── models/
-│   └── routes/
-├── database/
-│   └── schema.sql
-├── .env.example
-├── package.json
-└── README.md
-```
-
----
-
-## 🚀 Local Development Setup
-
-### 1. Prerequisites
-
-- Node.js 18+
-- PostgreSQL database (local or [Supabase](https://supabase.com) free tier)
-- Free [Cloudinary](https://cloudinary.com) account
-
-### 2. Clone / Extract & Install
+## 🚀 Quick Start
 
 ```bash
-cd cloudgalary
+cd cloud-gallery
 npm install
-```
+cd client && npm install && cd ..
 
-### 3. Configure Environment
-
-```bash
 cp .env.example .env
-```
+# Set DATABASE_URL, JWT_SECRET, Cloudinary keys
+# Optional: SMTP_* for real emails
 
-Edit `.env` with your values:
-
-```env
-PORT=5000
-NODE_ENV=development
-CLIENT_URL=http://localhost:5500
-
-JWT_SECRET=change_this_to_a_long_random_string_at_least_32_chars
-JWT_EXPIRES_IN=7d
-
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
-
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-
-MAX_FILE_SIZE_MB=15
-MAX_FILES_PER_UPLOAD=20
-```
-
-### 4. Initialize Database
-
-Connect to your PostgreSQL database and run the schema:
-
-```bash
 psql $DATABASE_URL -f database/schema.sql
+
+npm run dev:server   # :5000
+npm run dev:client   # :5173 (proxies /api)
 ```
 
-Or in Supabase: open the SQL Editor and paste the contents of `database/schema.sql`.
+## 📡 Key API Endpoints
 
-### 5. Start the Server
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/auth/register | Register (+ send verification) |
+| POST | /api/auth/verify-email | Verify email token |
+| POST | /api/auth/forgot-password | Request reset link |
+| POST | /api/auth/reset-password | Reset with token |
+| POST | /api/photos/bulk-download | ZIP of selected / gallery |
+| POST | /api/photos/bulk-delete | Soft-delete many |
+| POST | /api/photos/purge | Permanent delete + Cloudinary |
+| POST | /api/photos/restore | Restore from trash |
+| PUT | /api/galleries/:id | Edit gallery |
+| DELETE | /api/galleries/:id | Permanent delete gallery + assets |
 
-```bash
-npm run dev
-# or
-npm start
+## 🔐 Email setup
+
+Without SMTP config, verification and reset emails are **logged to the server console** (dev-friendly).
+
+To send real email, set in `.env`:
+
+```
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587
+SMTP_USER=resend
+SMTP_PASS=re_xxxx
+EMAIL_FROM=CloudGallery <noreply@yourdomain.com>
+CLIENT_URL=https://your-frontend.com
 ```
 
-API runs at: `http://localhost:5000`
 
-### 6. Serve the Frontend
+## 🌐 Deployment (Vercel + Render)
 
-Open the `client/` folder with any static server, for example:
+See **[DEPLOY.md](./DEPLOY.md)** for step-by-step instructions:
 
-```bash
-# Using VS Code Live Server extension, or:
-npx serve client -p 5500
-```
-
-Open `http://localhost:5500` in your browser.
-
-> The frontend automatically points to `http://localhost:5000/api` when running on localhost.
-
----
-
-## 🌐 Production Deployment
-
-### Option A — Single Server (Recommended for simplicity)
-
-Deploy the whole project to **Render**, **Railway**, or **Fly.io**.
-
-1. Push the repo to GitHub.
-2. Create a new Web Service.
-3. Set build command: `npm install`
-4. Set start command: `npm start`
-5. Add all environment variables from `.env`.
-6. Run the schema SQL once against your production database.
-7. The Express server will serve both the API (`/api/*`) and the static frontend.
-
-### Option B — Split Frontend / Backend
-
-**Backend (Render / Railway):**
-- Root directory: project root
-- Start: `npm start`
-- Add env vars (especially `CLIENT_URL` = your frontend URL)
-
-**Frontend (Netlify / Vercel / Cloudflare Pages):**
-- Publish directory: `client`
-- In `client/js/api.js` the API base automatically becomes `/api` when not on localhost.
-- If frontend and backend are on different domains, update `API_BASE` in `api.js` to your backend URL, e.g.:
-
-```js
-const API_BASE = 'https://your-api.onrender.com/api';
-```
-
-Also add your frontend domain to the CORS allowed origins in `server/server.js`.
-
-### Database
-
-- **Supabase** (easiest): Create a free project → copy the connection string → paste into `DATABASE_URL`.
-- Or any managed PostgreSQL (Neon, Railway, Render Postgres, etc.).
-
-### Cloudinary
-
-1. Sign up at [cloudinary.com](https://cloudinary.com)
-2. Dashboard → copy Cloud Name, API Key, API Secret
-3. Paste into environment variables
-
----
-
-## 📡 Main API Endpoints
-
-| Method | Endpoint                        | Auth | Description                |
-|--------|---------------------------------|------|----------------------------|
-| POST   | /api/auth/register              | No   | Create account             |
-| POST   | /api/auth/login                 | No   | Login                      |
-| GET    | /api/auth/me                    | Yes  | Current user               |
-| GET    | /api/galleries                  | Yes  | List my galleries          |
-| POST   | /api/galleries                  | Yes  | Create gallery             |
-| GET    | /api/galleries/slug/:slug       | Opt  | Public gallery by slug     |
-| GET    | /api/galleries/stats            | Yes  | Dashboard stats            |
-| POST   | /api/photos/upload              | Yes  | Upload photos (multipart)  |
-| GET    | /api/photos/gallery/:galleryId  | Opt  | List photos                |
-| DELETE | /api/photos/:id                 | Yes  | Soft-delete photo          |
-| POST   | /api/photos/:id/favorite        | Yes  | Toggle favorite            |
-
----
-
-## 🔐 Security Notes
-
-- Passwords are hashed with bcrypt (cost 12)
-- JWT tokens for protected routes
-- File type + size validation on upload
-- Rate limiting on auth endpoints
-- Helmet security headers
-- Never expose Cloudinary secrets in frontend code
-- Private & password galleries enforced on the backend
-
----
-
-## 📱 Usage Flow
-
-1. Register / Login
-2. Create a new Event Gallery
-3. Upload photos (drag & drop supported)
-4. Click **Share** → copy link or send via WhatsApp
-5. Guests open the link and view / download photos (no account required for public galleries)
-
----
-
-## 🧪 Quick Test Checklist
-
-- [ ] Register a new user
-- [ ] Login
-- [ ] Create a public gallery
-- [ ] Upload several photos
-- [ ] Open the share link in an incognito window
-- [ ] Create a password-protected gallery and unlock it
-- [ ] Toggle dark mode
-- [ ] Favorite a photo
-- [ ] Download a photo
-
----
+1. Postgres (Neon / Supabase) + run `database/schema.sql`
+2. Cloudinary keys
+3. **Render** → Web Service for the Express API
+4. **Vercel** → Project with Root Directory = `client`, env `VITE_API_URL=https://your-api.onrender.com/api`
+5. Set Render `CLIENT_URL` to your Vercel URL
 
 ## 📄 License
 
-MIT — feel free to use this project for learning or production.
-
----
-
-**Built with ❤️ for photographers, schools, churches, wedding planners & families.**
+MIT

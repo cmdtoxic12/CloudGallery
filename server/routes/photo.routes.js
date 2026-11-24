@@ -5,6 +5,10 @@ const {
   getGalleryPhotos,
   getPhoto,
   deletePhoto,
+  bulkDelete,
+  purgePhotos,
+  restorePhotos,
+  bulkDownload,
   toggleFavorite,
   getFavorites,
   trackDownload,
@@ -21,6 +25,10 @@ router.post(
 );
 
 router.get('/favorites', authenticate, getFavorites);
+router.post('/bulk-delete', authenticate, bulkDelete);
+router.post('/purge', authenticate, purgePhotos);
+router.post('/restore', authenticate, restorePhotos);
+router.post('/bulk-download', optionalAuth, bulkDownload);
 router.get('/gallery/:galleryId', optionalAuth, getGalleryPhotos);
 router.get('/:id', optionalAuth, getPhoto);
 router.delete('/:id', authenticate, deletePhoto);

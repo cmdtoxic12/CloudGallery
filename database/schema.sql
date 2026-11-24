@@ -1,7 +1,6 @@
--- CloudGalary Database Schema
+-- CloudGallery Database Schema v2
 -- Compatible with PostgreSQL / Supabase
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Users table
@@ -12,6 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   avatar_url TEXT,
   storage_used BIGINT DEFAULT 0,
+  email_verified BOOLEAN DEFAULT FALSE,
+  verification_token VARCHAR(255),
+  verification_token_expires TIMESTAMPTZ,
+  reset_token VARCHAR(255),
+  reset_token_expires TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -72,7 +76,7 @@ CREATE TABLE IF NOT EXISTS shares (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Gallery access for password-protected (session tokens optional)
+-- Gallery access for password-protected
 CREATE TABLE IF NOT EXISTS gallery_access (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   gallery_id UUID NOT NULL REFERENCES galleries(id) ON DELETE CASCADE,
@@ -81,7 +85,7 @@ CREATE TABLE IF NOT EXISTS gallery_access (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexes for performance
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_galleries_owner ON galleries(owner_id);
 CREATE INDEX IF NOT EXISTS idx_galleries_slug ON galleries(slug);
 CREATE INDEX IF NOT EXISTS idx_photos_gallery ON photos(gallery_id);
@@ -89,8 +93,10 @@ CREATE INDEX IF NOT EXISTS idx_photos_user ON photos(user_id);
 CREATE INDEX IF NOT EXISTS idx_photos_deleted ON photos(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_photo ON favorites(photo_id);
+CREATE INDEX IF NOT EXISTS idx_users_verification_token ON users(verification_token);
+CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token);
 
--- Updated_at trigger function
+-- Updated_at trigger
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -99,7 +105,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Apply triggers
 DROP TRIGGER IF EXISTS users_updated_at ON users;
 CREATE TRIGGER users_updated_at
   BEFORE UPDATE ON users
@@ -114,3 +119,23 @@ DROP TRIGGER IF EXISTS photos_updated_at ON photos;
 CREATE TRIGGER photos_updated_at
   BEFORE UPDATE ON photos
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Migration helper for existing DBs (safe to re-run)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verified') THEN
+    ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='verification_token') THEN
+    ALTER TABLE users ADD COLUMN verification_token VARCHAR(255);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='verification_token_expires') THEN
+    ALTER TABLE users ADD COLUMN verification_token_expires TIMESTAMPTZ;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='reset_token') THEN
+    ALTER TABLE users ADD COLUMN reset_token VARCHAR(255);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='reset_token_expires') THEN
+    ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMPTZ;
+  END IF;
+END $$;

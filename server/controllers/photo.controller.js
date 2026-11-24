@@ -1,3 +1,6 @@
+const archiver = require('archiver');
+const https = require('https');
+const http = require('http');
 const { query } = require('../config/database');
 const { uploadToCloudinary, deleteFromCloudinary, getThumbnailUrl } = require('../config/cloudinary');
 
@@ -13,7 +16,6 @@ const uploadPhotos = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No files uploaded' });
     }
 
-    // Verify ownership
     const galleryCheck = await query(
       'SELECT id, owner_id, cover_photo_url FROM galleries WHERE id = $1',
       [galleryId]
@@ -32,8 +34,7 @@ const uploadPhotos = async (req, res) => {
     for (const file of req.files) {
       try {
         const result = await uploadToCloudinary(file.buffer, {
-          folder: `cloudgalary/${galleryId}`,
-          public_id: undefined, // let Cloudinary generate
+          folder: `cloudgallery/${galleryId}`,
         });
 
         const thumbnailUrl = getThumbnailUrl(result.public_id, 400);
@@ -60,7 +61,6 @@ const uploadPhotos = async (req, res) => {
         uploadedPhotos.push(photoResult.rows[0]);
         totalSize += result.bytes;
 
-        // Set cover if gallery has none
         if (!galleryCheck.rows[0].cover_photo_url && uploadedPhotos.length === 1) {
           await query(
             'UPDATE galleries SET cover_photo_url = $1 WHERE id = $2',
@@ -69,11 +69,9 @@ const uploadPhotos = async (req, res) => {
         }
       } catch (uploadErr) {
         console.error('Single file upload error:', uploadErr.message);
-        // Continue with remaining files
       }
     }
 
-    // Update user storage
     if (totalSize > 0) {
       await query(
         'UPDATE users SET storage_used = storage_used + $1 WHERE id = $2',
@@ -98,8 +96,8 @@ const getGalleryPhotos = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = (page - 1) * limit;
+    const includeDeleted = req.query.trash === '1' || req.query.trash === 'true';
 
-    // Check gallery access
     const galleryResult = await query(
       'SELECT id, owner_id, visibility, password_hash FROM galleries WHERE id = $1',
       [galleryId]
@@ -117,8 +115,13 @@ const getGalleryPhotos = async (req, res) => {
       }
     }
 
+    // Only owner can see trash
+    const deletedFilter = includeDeleted && req.user && req.user.id === gallery.owner_id
+      ? 'p.is_deleted = TRUE'
+      : 'p.is_deleted = FALSE';
+
     const countResult = await query(
-      'SELECT COUNT(*)::int AS total FROM photos WHERE gallery_id = $1 AND is_deleted = FALSE',
+      `SELECT COUNT(*)::int AS total FROM photos p WHERE p.gallery_id = $1 AND ${deletedFilter}`,
       [galleryId]
     );
 
@@ -129,7 +132,7 @@ const getGalleryPhotos = async (req, res) => {
                 WHERE f.photo_id = p.id AND f.user_id = $1
               ) AS is_favorited
        FROM photos p
-       WHERE p.gallery_id = $2 AND p.is_deleted = FALSE
+       WHERE p.gallery_id = $2 AND ${deletedFilter}
        ORDER BY p.created_at DESC
        LIMIT $3 OFFSET $4`,
       [req.user?.id || null, galleryId, limit, offset]
@@ -175,7 +178,6 @@ const getPhoto = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    // Increment view
     await query('UPDATE photos SET views = views + 1 WHERE id = $1', [id]);
 
     res.json({ success: true, data: { photo } });
@@ -185,6 +187,7 @@ const getPhoto = async (req, res) => {
   }
 };
 
+/** Soft-delete a single photo */
 const deletePhoto = async (req, res) => {
   try {
     const { id } = req.params;
@@ -206,16 +209,15 @@ const deletePhoto = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    // Soft delete
+    if (photo.is_deleted) {
+      return res.json({ success: true, message: 'Photo already in trash' });
+    }
+
     await query(
       'UPDATE photos SET is_deleted = TRUE, deleted_at = NOW() WHERE id = $1',
       [id]
     );
 
-    // Optionally hard delete from Cloudinary after a grace period
-    // For now we keep the file for potential restore
-
-    // Update storage
     await query(
       'UPDATE users SET storage_used = GREATEST(0, storage_used - $1) WHERE id = $2',
       [photo.file_size, req.user.id]
@@ -225,6 +227,263 @@ const deletePhoto = async (req, res) => {
   } catch (error) {
     console.error('Delete photo error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete photo' });
+  }
+};
+
+/** Soft-delete multiple photos */
+const bulkDelete = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Photo IDs required' });
+    }
+
+    // Verify ownership for all
+    const result = await query(
+      `SELECT p.id, p.file_size, p.is_deleted, g.owner_id
+       FROM photos p
+       JOIN galleries g ON g.id = p.gallery_id
+       WHERE p.id = ANY($1::uuid[])`,
+      [ids]
+    );
+
+    const owned = result.rows.filter((r) => r.owner_id === req.user.id && !r.is_deleted);
+    if (owned.length === 0) {
+      return res.status(404).json({ success: false, message: 'No matching photos found' });
+    }
+
+    const ownedIds = owned.map((r) => r.id);
+    const totalSize = owned.reduce((sum, r) => sum + Number(r.file_size || 0), 0);
+
+    await query(
+      `UPDATE photos SET is_deleted = TRUE, deleted_at = NOW() WHERE id = ANY($1::uuid[])`,
+      [ownedIds]
+    );
+
+    if (totalSize > 0) {
+      await query(
+        'UPDATE users SET storage_used = GREATEST(0, storage_used - $1) WHERE id = $2',
+        [totalSize, req.user.id]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `${ownedIds.length} photo(s) moved to trash`,
+      data: { deleted: ownedIds.length },
+    });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    res.status(500).json({ success: false, message: 'Bulk delete failed' });
+  }
+};
+
+/** Permanently delete photos from DB + Cloudinary */
+const purgePhotos = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Photo IDs required' });
+    }
+
+    const result = await query(
+      `SELECT p.id, p.public_id, p.file_size, p.is_deleted, g.owner_id
+       FROM photos p
+       JOIN galleries g ON g.id = p.gallery_id
+       WHERE p.id = ANY($1::uuid[])`,
+      [ids]
+    );
+
+    const owned = result.rows.filter((r) => r.owner_id === req.user.id);
+    if (owned.length === 0) {
+      return res.status(404).json({ success: false, message: 'No matching photos found' });
+    }
+
+    let purged = 0;
+    let cloudinaryErrors = 0;
+
+    for (const photo of owned) {
+      try {
+        if (photo.public_id) {
+          await deleteFromCloudinary(photo.public_id);
+        }
+      } catch (err) {
+        console.error('Cloudinary purge error for', photo.public_id, err.message);
+        cloudinaryErrors += 1;
+      }
+
+      await query('DELETE FROM photos WHERE id = $1', [photo.id]);
+      purged += 1;
+
+      // Only subtract storage if it was still active (not already soft-deleted)
+      if (!photo.is_deleted && photo.file_size) {
+        await query(
+          'UPDATE users SET storage_used = GREATEST(0, storage_used - $1) WHERE id = $2',
+          [photo.file_size, req.user.id]
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${purged} photo(s) permanently deleted`,
+      data: { purged, cloudinaryErrors },
+    });
+  } catch (error) {
+    console.error('Purge photos error:', error);
+    res.status(500).json({ success: false, message: 'Permanent delete failed' });
+  }
+};
+
+/** Restore soft-deleted photos */
+const restorePhotos = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Photo IDs required' });
+    }
+
+    const result = await query(
+      `SELECT p.id, p.file_size, p.is_deleted, g.owner_id
+       FROM photos p
+       JOIN galleries g ON g.id = p.gallery_id
+       WHERE p.id = ANY($1::uuid[]) AND p.is_deleted = TRUE`,
+      [ids]
+    );
+
+    const owned = result.rows.filter((r) => r.owner_id === req.user.id);
+    if (owned.length === 0) {
+      return res.status(404).json({ success: false, message: 'No matching trashed photos found' });
+    }
+
+    const ownedIds = owned.map((r) => r.id);
+    const totalSize = owned.reduce((sum, r) => sum + Number(r.file_size || 0), 0);
+
+    await query(
+      `UPDATE photos SET is_deleted = FALSE, deleted_at = NULL WHERE id = ANY($1::uuid[])`,
+      [ownedIds]
+    );
+
+    if (totalSize > 0) {
+      await query(
+        'UPDATE users SET storage_used = storage_used + $1 WHERE id = $2',
+        [totalSize, req.user.id]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `${ownedIds.length} photo(s) restored`,
+      data: { restored: ownedIds.length },
+    });
+  } catch (error) {
+    console.error('Restore photos error:', error);
+    res.status(500).json({ success: false, message: 'Restore failed' });
+  }
+};
+
+/** Stream a ZIP of selected (or all) photos */
+const bulkDownload = async (req, res) => {
+  try {
+    const { ids, galleryId } = req.body;
+
+    let photos;
+    if (Array.isArray(ids) && ids.length > 0) {
+      const result = await query(
+        `SELECT p.id, p.file_name, p.image_url, p.public_id, g.owner_id, g.visibility
+         FROM photos p
+         JOIN galleries g ON g.id = p.gallery_id
+         WHERE p.id = ANY($1::uuid[]) AND p.is_deleted = FALSE`,
+        [ids]
+      );
+      photos = result.rows;
+    } else if (galleryId) {
+      const result = await query(
+        `SELECT p.id, p.file_name, p.image_url, p.public_id, g.owner_id, g.visibility
+         FROM photos p
+         JOIN galleries g ON g.id = p.gallery_id
+         WHERE p.gallery_id = $1 AND p.is_deleted = FALSE
+         ORDER BY p.created_at ASC`,
+        [galleryId]
+      );
+      photos = result.rows;
+    } else {
+      return res.status(400).json({ success: false, message: 'Provide photo ids or galleryId' });
+    }
+
+    if (!photos || photos.length === 0) {
+      return res.status(404).json({ success: false, message: 'No photos found' });
+    }
+
+    // Access check: private galleries only for owner
+    const first = photos[0];
+    if (first.visibility === 'private' && (!req.user || req.user.id !== first.owner_id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const zipName = `cloudgallery-${Date.now()}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+
+    const archive = archiver('zip', { zlib: { level: 5 } });
+    archive.on('error', (err) => {
+      console.error('Archive error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'ZIP creation failed' });
+      }
+    });
+    archive.pipe(res);
+
+    const usedNames = new Set();
+    const fetchImage = (url) =>
+      new Promise((resolve, reject) => {
+        const lib = url.startsWith('https') ? https : http;
+        lib
+          .get(url, (response) => {
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+              fetchImage(response.headers.location).then(resolve).catch(reject);
+              return;
+            }
+            if (response.statusCode !== 200) {
+              reject(new Error(`HTTP ${response.statusCode}`));
+              return;
+            }
+            const chunks = [];
+            response.on('data', (c) => chunks.push(c));
+            response.on('end', () => resolve(Buffer.concat(chunks)));
+            response.on('error', reject);
+          })
+          .on('error', reject);
+      });
+
+    for (const photo of photos) {
+      try {
+        const buffer = await fetchImage(photo.image_url);
+        let name = photo.file_name || `${photo.id}.jpg`;
+        // Avoid duplicate names in zip
+        if (usedNames.has(name)) {
+          const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '';
+          const base = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name;
+          let i = 1;
+          while (usedNames.has(`${base}-${i}${ext}`)) i += 1;
+          name = `${base}-${i}${ext}`;
+        }
+        usedNames.add(name);
+        archive.append(buffer, { name });
+
+        // Track download (fire-and-forget)
+        query('UPDATE photos SET downloads = downloads + 1 WHERE id = $1', [photo.id]).catch(() => {});
+      } catch (err) {
+        console.error('Failed to add photo to zip:', photo.id, err.message);
+      }
+    }
+
+    await archive.finalize();
+  } catch (error) {
+    console.error('Bulk download error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Download failed' });
+    }
   }
 };
 
@@ -298,6 +557,10 @@ module.exports = {
   getGalleryPhotos,
   getPhoto,
   deletePhoto,
+  bulkDelete,
+  purgePhotos,
+  restorePhotos,
+  bulkDownload,
   toggleFavorite,
   getFavorites,
   trackDownload,

@@ -31,10 +31,18 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+    // Allow no-origin (mobile apps, curl), configured origins, and all in development
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      process.env.NODE_ENV !== 'production'
+    ) {
+      callback(null, true);
+    } else if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow all in early stage; tighten later
+      // Production: still allow if CLIENT_URL not set yet (set it for security)
+      callback(null, true);
     }
   },
   credentials: true,
@@ -68,19 +76,31 @@ app.use('/api/users', userRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'CloudGalary API is running', timestamp: new Date().toISOString() });
+  res.json({ success: true, message: 'CloudGallery API is running', timestamp: new Date().toISOString() });
 });
 
 // Serve frontend static files (for production single-deploy)
-app.use(express.static(path.join(__dirname, '../client')));
+// In production, serve the Vite build from client/dist
+const clientDist = path.join(__dirname, '../client/dist');
+const clientPublic = path.join(__dirname, '../client');
+
+app.use(express.static(clientDist));
+app.use(express.static(clientPublic)); // fallback for public assets
 
 // SPA fallback for client routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
-  res.sendFile(path.join(__dirname, '../client/index.html'), (err) => {
-    if (err) next();
+  const indexPath = path.join(clientDist, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      // Fallback for dev without build
+      res.sendFile(path.join(clientPublic, 'index.html'), (err2) => {
+        if (err2) next();
+      });
+    }
   });
 });
+
 
 // Error handler
 app.use(errorHandler);
@@ -91,6 +111,6 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 CloudGalary server running on port ${PORT}`);
+  console.log(`🚀 CloudGallery server running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

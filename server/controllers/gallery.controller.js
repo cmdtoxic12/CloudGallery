@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../config/database');
+const { deleteFromCloudinary } = require('../config/cloudinary');
 
 const generateSlug = (name) => {
   const base = name
@@ -236,10 +237,41 @@ const deleteGallery = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    // Soft-delete photos first is handled by CASCADE, but we can hard delete gallery
+    // Fetch all photos (including soft-deleted) so we can purge Cloudinary
+    const photosResult = await query(
+      'SELECT id, public_id, file_size, is_deleted FROM photos WHERE gallery_id = $1',
+      [id]
+    );
+
+    let totalActiveSize = 0;
+    for (const photo of photosResult.rows) {
+      try {
+        if (photo.public_id) {
+          await deleteFromCloudinary(photo.public_id);
+        }
+      } catch (err) {
+        console.error('Cloudinary delete on gallery purge:', photo.public_id, err.message);
+      }
+      if (!photo.is_deleted && photo.file_size) {
+        totalActiveSize += Number(photo.file_size);
+      }
+    }
+
+    // CASCADE will remove photos, favorites, shares
     await query('DELETE FROM galleries WHERE id = $1', [id]);
 
-    res.json({ success: true, message: 'Gallery deleted successfully' });
+    if (totalActiveSize > 0) {
+      await query(
+        'UPDATE users SET storage_used = GREATEST(0, storage_used - $1) WHERE id = $2',
+        [totalActiveSize, req.user.id]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Gallery and all photos permanently deleted',
+      data: { photosRemoved: photosResult.rows.length },
+    });
   } catch (error) {
     console.error('Delete gallery error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete gallery' });

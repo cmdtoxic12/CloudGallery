@@ -1,22 +1,18 @@
 {
-  "name": "cloudgalary",
-  "version": "1.0.0",
-  "description": "Cloud-based Event Photo Gallery & Sharing Platform",
-  "main": "server/server.js",
+  "name": "cloudgallery",
+  "version": "2.1.0",
+  "description": "CloudGallery — Modern Event Photo Gallery & Sharing Platform (React + Vite + Tailwind + Express)",
+  "private": true,
   "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "nodemon server/server.js",
+    "dev:client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
     "start": "node server/server.js",
-    "dev": "nodemon server/server.js",
     "db:init": "node server/config/initDb.js"
   },
-  "keywords": [
-    "photo-gallery",
-    "cloudinary",
-    "express",
-    "event-photos"
-  ],
-  "author": "CloudGalary",
-  "license": "MIT",
   "dependencies": {
+    "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
@@ -26,10 +22,12 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.16",
     "pg": "^8.13.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "nodemon": "^3.1.4"
   },
   "engines": {

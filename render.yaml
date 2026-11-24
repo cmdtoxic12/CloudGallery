@@ -1,0 +1,33 @@
+# Optional Render Blueprint for the API
+# Dashboard → New → Blueprint → connect this repo
+services:
+  - type: web
+    name: cloudgallery-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DATABASE_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: MAX_FILE_SIZE_MB
+        value: 15
+      - key: MAX_FILES_PER_UPLOAD
+        value: 20
