@@ -573,7 +573,8 @@ const trackDownload = async (req, res) => {
 
     await query('UPDATE photos SET downloads = downloads + 1 WHERE id = $1', [id]);
 
-    const downloadUrl = getWatermarkedUrl(row.public_id, row) || row.image_url;
+    const downloadUrl =
+  getWatermarkedUrl(row.public_id, row, { attachment: row.file_name }) || row.image_url;
 
     res.json({
       success: true,

@@ -51,69 +51,48 @@ const getThumbnailUrl = (publicId, width = 400) => {
  * Build a Cloudinary URL with optional text + logo watermark overlays.
  * Applied at delivery time so originals stay clean in storage.
  */
-const getWatermarkedUrl = (publicId, gallery = {}) => {
+const getWatermarkedUrl = (publicId, gallery = {}, opts = {}) => {
   if (!publicId) return null;
+
+  // fl_attachment forces Content-Disposition: attachment; Cloudinary adds the correct extension
+  const flags = opts.attachment
+    ? `attachment:${String(opts.attachment).replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_')}`
+    : undefined;
+
+  const deliver = (extra) =>
+    cloudinary.url(publicId, { transformation: extra, flags, secure: true });
+
   if (!gallery.watermark_enabled) {
-    return cloudinary.url(publicId, {
-      quality: 'auto:best',
-      fetch_format: 'auto',
-      secure: true,
-    });
+    // Note: skip fetch_format:'auto' here so downloads keep the ORIGINAL format
+    // (otherwise visitors may get a .webp file named .jpg)
+    return deliver([{ quality: 'auto:best' }]);
   }
 
   const gravity = gallery.watermark_position || 'south_east';
   const opacity = Math.min(100, Math.max(10, parseInt(gallery.watermark_opacity, 10) || 50));
   const transformation = [];
 
-  // Logo overlay (public_id uses : instead of / in overlays)
   if (gallery.watermark_logo_public_id) {
-    const overlayId = String(gallery.watermark_logo_public_id).replace(/\//g, ':');
     transformation.push({
-      overlay: overlayId,
-      gravity,
-      opacity,
-      width: 200,
-      flags: 'relative',
-      x: 20,
-      y: 20,
+      overlay: String(gallery.watermark_logo_public_id).replace(/\//g, ':'),
+      gravity, opacity, width: 200, flags: 'relative', x: 20, y: 20,
     });
   }
 
-  // Text watermark
   if (gallery.watermark_text && String(gallery.watermark_text).trim()) {
-    const text = String(gallery.watermark_text).trim().slice(0, 80);
     transformation.push({
-      overlay: {
-        font_family: 'Arial',
-        font_size: 36,
-        font_weight: 'bold',
-        text,
-      },
+      overlay: { font_family: 'Arial', font_size: 36, font_weight: 'bold',
+                 text: String(gallery.watermark_text).trim().slice(0, 80) },
       gravity: gallery.watermark_logo_public_id ? 'south' : gravity,
-      opacity,
-      color: 'white',
-      x: 20,
-      y: 20,
+      opacity, color: 'white', x: 20, y: 20,
     });
   }
 
-  // If enabled but no text/logo, still return clean high-quality URL
   if (transformation.length === 0) {
-    return cloudinary.url(publicId, {
-      quality: 'auto:best',
-      fetch_format: 'auto',
-      secure: true,
-    });
+    return deliver([{ quality: 'auto:best' }]);
   }
 
-  return cloudinary.url(publicId, {
-    transformation: [
-      ...transformation,
-      { quality: 'auto:best' },
-      { fetch_format: 'auto' },
-    ],
-    secure: true,
-  });
+  return deliver([...transformation, { quality: 'auto:best' }]);
 };
 
 /**
