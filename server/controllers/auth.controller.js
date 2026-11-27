@@ -15,6 +15,20 @@ const generateToken = (userId) => {
 
 const register = async (req, res) => {
   try {
+    // Enforce registration state on the server; frontend hiding is not security.
+    const registrationSetting = await query(
+      `SELECT setting_value FROM app_settings WHERE setting_key = 'registration_open' LIMIT 1`
+    );
+    const settingValue = registrationSetting.rows[0]?.setting_value;
+    const registrationOpen = settingValue === undefined || settingValue === true || settingValue === 'true';
+    if (!registrationOpen) {
+      return res.status(403).json({
+        success: false,
+        code: 'REGISTRATION_CLOSED',
+        message: 'Account registration is currently closed. Please contact the administrator.',
+      });
+    }
+
     const { name, email, password, confirmPassword } = req.body;
 
     if (!name || !email || !password) {

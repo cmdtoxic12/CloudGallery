@@ -59,7 +59,10 @@ npm run dev:client   # :5173 (proxies /api)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/auth/register | Register (+ send verification) |
+| POST | /api/auth/register | Register (+ send verification; blocked when public registration is closed) |
+| GET | /api/settings/registration | Read public registration status |
+| GET | /api/settings/admin | Read admin registration settings (admin only) |
+| PUT | /api/settings/registration | Open/close public registration (admin only) |
 | POST | /api/auth/verify-email | Verify email token |
 | POST | /api/auth/forgot-password | Request reset link |
 | POST | /api/auth/reset-password | Reset with token |

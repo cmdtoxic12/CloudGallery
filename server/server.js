@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 const photoRoutes = require('./routes/photo.routes');
 const userRoutes = require('./routes/user.routes');
+const settingsRoutes = require('./routes/settings.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -73,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/galleries', galleryRoutes);
 app.use('/api/photos', photoRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

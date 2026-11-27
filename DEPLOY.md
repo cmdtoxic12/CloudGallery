@@ -183,3 +183,17 @@ If you prefer one URL (API + static SPA):
 - Health: `https://<render>/api/health`
 - Schema: `database/schema.sql`
 - Env template: `.env.example`
+
+
+## Admin-controlled public registration
+
+CloudGallery supports an administrator-controlled public registration switch.
+
+1. In your PostgreSQL database (the same database used by Render), run `database/migrations/2026-11-27-registration-settings.sql` once. This creates the persistent setting and defaults registration to OPEN. The same table/seed is also included in `database/schema.sql` for fresh installations.
+2. In Render → your CloudGallery API service → Environment, add `ADMIN_EMAIL` with the exact email address of your existing CloudGallery administrator account. Do not use an email address that is not already controlled by you.
+3. Redeploy/restart the Render service.
+4. Sign in to CloudGallery using that account and open Dashboard. The administrator will see the **Public registration** control and can open or close registration.
+
+When registration is closed, the backend rejects `POST /api/auth/register` with HTTP 403, even if a visitor calls the API directly. Existing users can still log in, verify email, reset passwords, and use shared galleries. The public gallery route does not show the **Get Started** registration button.
+
+The admin check is enforced by the Render API using `ADMIN_EMAIL`; hiding the dashboard control in the browser is not the security boundary.

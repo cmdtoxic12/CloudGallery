@@ -16,6 +16,17 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Persistent application settings (including public registration control)
+CREATE TABLE IF NOT EXISTS app_settings (
+  setting_key VARCHAR(100) PRIMARY KEY,
+  setting_value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO app_settings (setting_key, setting_value)
+VALUES ('registration_open', 'true'::jsonb)
+ON CONFLICT (setting_key) DO NOTHING;
+
 -- Galleries table
 CREATE TABLE IF NOT EXISTS galleries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

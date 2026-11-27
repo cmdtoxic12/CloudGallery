@@ -47,6 +47,16 @@ export const authApi = {
     api.post<ApiResponse>('/auth/reset-password', data),
 }
 
+// Registration and administrator settings
+export const settingsApi = {
+  registrationStatus: () =>
+    api.get<ApiResponse<{ registrationOpen: boolean }>>('/settings/registration'),
+  adminSettings: () =>
+    api.get<ApiResponse<{ registrationOpen: boolean; isAdmin: boolean }>>('/settings/admin'),
+  updateRegistration: (registrationOpen: boolean) =>
+    api.put<ApiResponse<{ registrationOpen: boolean }>>('/settings/registration', { registrationOpen }),
+}
+
 // Galleries
 export const galleryApi = {
   list: () => api.get<ApiResponse<{ galleries: Gallery[] }>>('/galleries'),

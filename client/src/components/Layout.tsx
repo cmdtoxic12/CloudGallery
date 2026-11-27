@@ -1,14 +1,15 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom'
-import { Cloud, LogOut, Moon, Sun, LayoutDashboard, Plus, Heart } from 'lucide-react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Cloud, LogOut, Moon, Sun, Plus } from 'lucide-react'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
 import { Button } from './ui/Button'
-import { cn } from '../lib/utils'
 
 export function Layout({ children }: { children?: React.ReactNode }) {
   const { user, isAuthenticated, logout } = useAuthStore()
   const { theme, toggle } = useThemeStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isSharedGallery = location.pathname.startsWith('/g/')
 
   const handleLogout = async () => {
     await logout()
@@ -65,14 +66,18 @@ export function Layout({ children }: { children?: React.ReactNode }) {
               </>
             ) : (
               <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/register">
-                  <Button size="sm">Get Started</Button>
-                </Link>
+                {!isSharedGallery && (
+                  <>
+                    <Link to="/login">
+                      <Button variant="ghost" size="sm">
+                        Login
+                      </Button>
+                    </Link>
+                    <Link to="/register">
+                      <Button size="sm">Get Started</Button>
+                    </Link>
+                  </>
+                )}
               </>
             )}
           </div>

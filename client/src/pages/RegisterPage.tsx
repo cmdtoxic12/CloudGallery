@@ -1,13 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '../components/ui/Button'
-import { authApi } from '../lib/api'
+import { authApi, settingsApi } from '../lib/api'
 import { useAuthStore } from '../stores/auth'
 
 export function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' })
   const [loading, setLoading] = useState(false)
+  const [checkingRegistration, setCheckingRegistration] = useState(true)
+  const [registrationOpen, setRegistrationOpen] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    settingsApi.registrationStatus()
+      .then(({ data }) => { if (active) setRegistrationOpen(data.data?.registrationOpen !== false) })
+      .catch(() => { if (active) setRegistrationOpen(false) })
+      .finally(() => { if (active) setCheckingRegistration(false) })
+    return () => { active = false }
+  }, [])
   const setAuth = useAuthStore((s) => s.setAuth)
   const navigate = useNavigate()
 
@@ -34,6 +45,28 @@ export function RegisterPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (checkingRegistration) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-md text-center text-[hsl(var(--muted-foreground))]">
+        Checking account registration availability…
+      </div>
+    )
+  }
+
+  if (!registrationOpen) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-md">
+        <div className="bg-[hsl(var(--card))] border rounded-2xl p-8 shadow-sm text-center">
+          <h1 className="text-2xl font-bold mb-3">Registration is currently closed</h1>
+          <p className="text-[hsl(var(--muted-foreground))] mb-6">
+            New CloudGallery accounts cannot be created at the moment. Please contact the administrator if you need access.
+          </p>
+          <Link to="/login" className="text-primary-600 font-medium hover:underline">Sign in to your existing account</Link>
+        </div>
+      </div>
+    )
   }
 
   return (

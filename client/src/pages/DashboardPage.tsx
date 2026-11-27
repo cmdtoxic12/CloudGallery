@@ -1,14 +1,41 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Image, Eye, HardDrive, Calendar, MapPin, MoreVertical, Trash2 } from 'lucide-react'
+import { Plus, Image, Eye, HardDrive, Calendar, MapPin, Trash2, ShieldCheck, Lock, Unlock } from 'lucide-react'
 import { toast } from 'sonner'
-import { galleryApi } from '../lib/api'
+import { galleryApi, settingsApi } from '../lib/api'
 import { formatBytes, formatDate } from '../lib/utils'
 import { Button } from '../components/ui/Button'
 import type { Gallery } from '../types'
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [registrationUpdating, setRegistrationUpdating] = useState(false)
+
+  const { data: adminSettings } = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: async () => (await settingsApi.adminSettings()).data.data!,
+    retry: false,
+  })
+
+  const handleRegistrationToggle = async () => {
+    if (!adminSettings) return
+    const nextValue = !adminSettings.registrationOpen
+    const action = nextValue ? 'open' : 'close'
+    if (!confirm(`Are you sure you want to ${action} public account registration?`)) return
+    setRegistrationUpdating(true)
+    try {
+      await settingsApi.updateRegistration(nextValue)
+      await queryClient.invalidateQueries({ queryKey: ['admin-settings'] })
+      toast.success(nextValue ? 'Public registration is now open' : 'Public registration is now closed')
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not update registration settings')
+    } finally {
+      setRegistrationUpdating(false)
+    }
+  }
+
 
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ['stats'],
@@ -50,6 +77,39 @@ export function DashboardPage() {
           New Gallery
         </Button>
       </div>
+
+      {/* Admin-only public registration controls. The API decides who is an admin. */}
+      {adminSettings?.isAdmin && (
+        <section className="mb-8 rounded-xl border bg-[hsl(var(--card))] p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center">
+                <ShieldCheck className="h-5 w-5 text-primary-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold">Public registration</h2>
+                <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                  {adminSettings.registrationOpen
+                    ? 'Anyone can create a CloudGallery account from the main website.'
+                    : 'New account creation is disabled. Existing users can still sign in and use their galleries.'}
+                </p>
+                <span className={`inline-flex items-center gap-1.5 mt-2 text-xs font-semibold ${adminSettings.registrationOpen ? 'text-green-600' : 'text-red-600'}`}>
+                  {adminSettings.registrationOpen ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                  Registration {adminSettings.registrationOpen ? 'OPEN' : 'CLOSED'}
+                </span>
+              </div>
+            </div>
+            <Button
+              variant={adminSettings.registrationOpen ? 'outline' : 'primary'}
+              onClick={handleRegistrationToggle}
+              loading={registrationUpdating}
+              className="shrink-0"
+            >
+              {adminSettings.registrationOpen ? 'Close registration' : 'Open registration'}
+            </Button>
+          </div>
+        </section>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
