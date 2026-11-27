@@ -1,9 +1,10 @@
--- CloudGallery Database Schema v2
--- Compatible with PostgreSQL / Supabase
+-- CloudGallery Database Schema v2.1
+-- Compatible with PostgreSQL / Supabase / Neon
+-- Safe to re-run on existing databases
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Users table
+-- Users table (base columns)
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
@@ -11,11 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   avatar_url TEXT,
   storage_used BIGINT DEFAULT 0,
-  email_verified BOOLEAN DEFAULT FALSE,
-  verification_token VARCHAR(255),
-  verification_token_expires TIMESTAMPTZ,
-  reset_token VARCHAR(255),
-  reset_token_expires TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -85,7 +81,48 @@ CREATE TABLE IF NOT EXISTS gallery_access (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexes
+-- ============================================================
+-- MIGRATE existing users table (MUST run BEFORE token indexes)
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'email_verified'
+  ) THEN
+    ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'verification_token'
+  ) THEN
+    ALTER TABLE users ADD COLUMN verification_token VARCHAR(255);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'verification_token_expires'
+  ) THEN
+    ALTER TABLE users ADD COLUMN verification_token_expires TIMESTAMPTZ;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'reset_token'
+  ) THEN
+    ALTER TABLE users ADD COLUMN reset_token VARCHAR(255);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'reset_token_expires'
+  ) THEN
+    ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMPTZ;
+  END IF;
+END $$;
+
+-- Indexes (after columns exist)
 CREATE INDEX IF NOT EXISTS idx_galleries_owner ON galleries(owner_id);
 CREATE INDEX IF NOT EXISTS idx_galleries_slug ON galleries(slug);
 CREATE INDEX IF NOT EXISTS idx_photos_gallery ON photos(gallery_id);
@@ -120,22 +157,26 @@ CREATE TRIGGER photos_updated_at
   BEFORE UPDATE ON photos
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- Migration helper for existing DBs (safe to re-run)
+-- Watermark columns on galleries (safe on existing DBs)
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verified') THEN
-    ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='galleries' AND column_name='watermark_enabled') THEN
+    ALTER TABLE galleries ADD COLUMN watermark_enabled BOOLEAN DEFAULT FALSE;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='verification_token') THEN
-    ALTER TABLE users ADD COLUMN verification_token VARCHAR(255);
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='galleries' AND column_name='watermark_text') THEN
+    ALTER TABLE galleries ADD COLUMN watermark_text VARCHAR(200);
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='verification_token_expires') THEN
-    ALTER TABLE users ADD COLUMN verification_token_expires TIMESTAMPTZ;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='galleries' AND column_name='watermark_logo_url') THEN
+    ALTER TABLE galleries ADD COLUMN watermark_logo_url TEXT;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='reset_token') THEN
-    ALTER TABLE users ADD COLUMN reset_token VARCHAR(255);
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='galleries' AND column_name='watermark_logo_public_id') THEN
+    ALTER TABLE galleries ADD COLUMN watermark_logo_public_id VARCHAR(255);
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='reset_token_expires') THEN
-    ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMPTZ;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='galleries' AND column_name='watermark_position') THEN
+    ALTER TABLE galleries ADD COLUMN watermark_position VARCHAR(30) DEFAULT 'south_east';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='galleries' AND column_name='watermark_opacity') THEN
+    ALTER TABLE galleries ADD COLUMN watermark_opacity INTEGER DEFAULT 50;
   END IF;
 END $$;
+

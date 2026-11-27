@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../config/database');
-const { deleteFromCloudinary } = require('../config/cloudinary');
+const { deleteFromCloudinary, uploadToCloudinary } = require('../config/cloudinary');
 
 const generateSlug = (name) => {
   const base = name
@@ -171,7 +171,20 @@ const getGalleryById = async (req, res) => {
 const updateGallery = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, location, event_date, visibility, password, cover_photo_url } = req.body;
+    const {
+      name,
+      description,
+      location,
+      event_date,
+      visibility,
+      password,
+      cover_photo_url,
+      watermark_enabled,
+      watermark_text,
+      watermark_position,
+      watermark_opacity,
+      clear_watermark_logo,
+    } = req.body;
 
     const existing = await query('SELECT * FROM galleries WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
@@ -191,6 +204,23 @@ const updateGallery = async (req, res) => {
       passwordHash = null;
     }
 
+    const positions = ['south_east', 'south_west', 'north_east', 'north_west', 'south', 'north', 'center'];
+    const pos = positions.includes(watermark_position) ? watermark_position : (existing.rows[0].watermark_position || 'south_east');
+    let opacity = existing.rows[0].watermark_opacity ?? 50;
+    if (watermark_opacity !== undefined && watermark_opacity !== null && watermark_opacity !== '') {
+      opacity = Math.min(100, Math.max(10, parseInt(watermark_opacity, 10) || 50));
+    }
+
+    let logoUrl = existing.rows[0].watermark_logo_url;
+    let logoPublicId = existing.rows[0].watermark_logo_public_id;
+    if (clear_watermark_logo) {
+      if (logoPublicId) {
+        try { await deleteFromCloudinary(logoPublicId); } catch (_) {}
+      }
+      logoUrl = null;
+      logoPublicId = null;
+    }
+
     const result = await query(
       `UPDATE galleries SET
          name = COALESCE($1, name),
@@ -199,9 +229,17 @@ const updateGallery = async (req, res) => {
          event_date = COALESCE($4, event_date),
          visibility = COALESCE($5, visibility),
          password_hash = $6,
-         cover_photo_url = COALESCE($7, cover_photo_url)
-       WHERE id = $8
-       RETURNING id, name, description, location, event_date, cover_photo_url, slug, visibility, views, created_at, updated_at`,
+         cover_photo_url = COALESCE($7, cover_photo_url),
+         watermark_enabled = COALESCE($8, watermark_enabled),
+         watermark_text = COALESCE($9, watermark_text),
+         watermark_position = $10,
+         watermark_opacity = $11,
+         watermark_logo_url = $12,
+         watermark_logo_public_id = $13
+       WHERE id = $14
+       RETURNING id, name, description, location, event_date, cover_photo_url, slug, visibility, views,
+                 watermark_enabled, watermark_text, watermark_logo_url, watermark_logo_public_id,
+                 watermark_position, watermark_opacity, created_at, updated_at`,
       [
         name || null,
         description !== undefined ? description : null,
@@ -210,6 +248,12 @@ const updateGallery = async (req, res) => {
         visibility || null,
         passwordHash,
         cover_photo_url || null,
+        typeof watermark_enabled === 'boolean' ? watermark_enabled : null,
+        watermark_text !== undefined ? (watermark_text || null) : existing.rows[0].watermark_text,
+        pos,
+        opacity,
+        logoUrl,
+        logoPublicId,
         id,
       ]
     );
@@ -222,6 +266,57 @@ const updateGallery = async (req, res) => {
   } catch (error) {
     console.error('Update gallery error:', error);
     res.status(500).json({ success: false, message: 'Failed to update gallery' });
+  }
+};
+
+/** Upload / replace gallery watermark logo */
+const uploadWatermarkLogo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Logo image is required' });
+    }
+
+    const existing = await query('SELECT * FROM galleries WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Gallery not found' });
+    }
+    if (existing.rows[0].owner_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    // Remove previous logo from Cloudinary
+    if (existing.rows[0].watermark_logo_public_id) {
+      try {
+        await deleteFromCloudinary(existing.rows[0].watermark_logo_public_id);
+      } catch (_) {}
+    }
+
+    const result = await uploadToCloudinary(req.file.buffer, {
+      folder: `cloudgallery/watermarks/${id}`,
+      skipTransform: true,
+    });
+
+    const updated = await query(
+      `UPDATE galleries SET
+         watermark_logo_url = $1,
+         watermark_logo_public_id = $2,
+         watermark_enabled = TRUE
+       WHERE id = $3
+       RETURNING id, name, description, location, event_date, cover_photo_url, slug, visibility, views,
+                 watermark_enabled, watermark_text, watermark_logo_url, watermark_logo_public_id,
+                 watermark_position, watermark_opacity, created_at, updated_at`,
+      [result.secure_url, result.public_id, id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Watermark logo uploaded',
+      data: { gallery: updated.rows[0] },
+    });
+  } catch (error) {
+    console.error('Upload watermark logo error:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload logo' });
   }
 };
 
@@ -331,6 +426,7 @@ module.exports = {
   getGalleryBySlug,
   getGalleryById,
   updateGallery,
+  uploadWatermarkLogo,
   deleteGallery,
   getDashboardStats,
   trackShare,

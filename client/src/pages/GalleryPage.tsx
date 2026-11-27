@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -32,6 +32,9 @@ export function GalleryPage({ isOwnerView = false }: Props) {
   const [selectMode, setSelectMode] = useState(false)
   const [showTrash, setShowTrash] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragCounter = useRef(0)
 
   const galleryQuery = useQuery({
     queryKey: ['gallery', id || slug],
@@ -83,9 +86,17 @@ export function GalleryPage({ isOwnerView = false }: Props) {
     }
   }
 
-  const handleUpload = async (files: FileList | null) => {
+  const handleUpload = async (files: FileList | File[] | null) => {
     if (!files || !gallery || !isOwnerView) return
-    const fileArr = Array.from(files)
+    const fileArr = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    if (fileArr.length === 0) {
+      toast.error('Please select image files (JPG, PNG, WebP, HEIC)')
+      return
+    }
+    if (fileArr.length > 20) {
+      toast.error('Maximum 20 photos per upload')
+      return
+    }
     setUploading(true)
     setUploadProgress(0)
     try {
@@ -98,7 +109,42 @@ export function GalleryPage({ isOwnerView = false }: Props) {
     } finally {
       setUploading(false)
       setUploadProgress(0)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  const onDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isOwnerView || showTrash || uploading) return
+    dragCounter.current += 1
+    if (e.dataTransfer.types.includes('Files')) setIsDragging(true)
+  }
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragging(false)
+    }
+  }
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current = 0
+    setIsDragging(false)
+    if (!isOwnerView || showTrash || uploading) return
+    const files = e.dataTransfer.files
+    if (files?.length) handleUpload(files)
   }
 
   const toggleFavorite = async (photoId: string) => {
@@ -116,13 +162,26 @@ export function GalleryPage({ isOwnerView = false }: Props) {
 
   const downloadPhoto = async (photo: Photo) => {
     try {
-      await photoApi.trackDownload(photo.id)
-    } catch {}
-    const a = document.createElement('a')
-    a.href = photo.image_url
-    a.download = photo.file_name
-    a.target = '_blank'
-    a.click()
+      const { data } = await photoApi.trackDownload(photo.id)
+      const url = data.data?.url || photo.image_url
+      const name = data.data?.file_name || photo.file_name
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      a.target = '_blank'
+      a.rel = 'noopener'
+      a.click()
+      if (data.data?.watermarked) {
+        toast.success('Download started (watermark applied)')
+      }
+    } catch {
+      // Fallback to original
+      const a = document.createElement('a')
+      a.href = photo.image_url
+      a.download = photo.file_name
+      a.target = '_blank'
+      a.click()
+    }
   }
 
   const handleDeleteOne = async (photoId: string) => {
@@ -279,7 +338,24 @@ export function GalleryPage({ isOwnerView = false }: Props) {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div
+      className="container mx-auto px-4 py-8 relative"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      {/* Full-page drop overlay */}
+      {isDragging && isOwnerView && !showTrash && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary-600/20 backdrop-blur-sm pointer-events-none">
+          <div className="rounded-2xl border-2 border-dashed border-primary-600 bg-[hsl(var(--card))] px-10 py-12 text-center shadow-xl">
+            <Upload className="h-12 w-12 mx-auto text-primary-600 mb-3" />
+            <p className="text-lg font-semibold">Drop photos to upload</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">JPG, PNG, WebP · up to 20 files</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
         <div>
@@ -301,22 +377,22 @@ export function GalleryPage({ isOwnerView = false }: Props) {
         <div className="flex flex-wrap gap-2">
           {isOwnerView && (
             <>
-              <label>
-                <Button disabled={uploading || busy}>
-                  <span className="cursor-pointer inline-flex items-center gap-2">
-                    <Upload className="h-4 w-4" />
-                    {uploading ? `${uploadProgress}%` : 'Upload'}
-                  </span>
-                </Button>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => handleUpload(e.target.files)}
-                  disabled={uploading || busy}
-                />
-              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
+                multiple
+                className="hidden"
+                onChange={(e) => handleUpload(e.target.files)}
+                disabled={uploading || busy}
+              />
+              <Button
+                disabled={uploading || busy}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4" />
+                {uploading ? `${uploadProgress}%` : 'Upload'}
+              </Button>
               <Link to={`/gallery/${gallery.id}/edit`}>
                 <Button variant="outline">
                   <Pencil className="h-4 w-4" />
@@ -396,10 +472,38 @@ export function GalleryPage({ isOwnerView = false }: Props) {
 
       {uploading && (
         <div className="mb-6">
+          <div className="flex items-center justify-between text-sm mb-1">
+            <span className="text-[hsl(var(--muted-foreground))]">Uploading photos…</span>
+            <span className="font-medium">{uploadProgress}%</span>
+          </div>
           <div className="h-2 bg-[hsl(var(--muted))] rounded-full overflow-hidden">
             <div className="h-full bg-primary-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
           </div>
         </div>
+      )}
+
+      {/* Drag & drop zone (owner, active photos view) */}
+      {isOwnerView && !showTrash && (
+        <button
+          type="button"
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          disabled={uploading}
+          className={cn(
+            'w-full mb-6 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors',
+            isDragging
+              ? 'border-primary-600 bg-primary-50 dark:bg-primary-950/40'
+              : 'border-[hsl(var(--border))] hover:border-primary-400 hover:bg-[hsl(var(--muted))]/40',
+            uploading && 'opacity-60 cursor-not-allowed'
+          )}
+        >
+          <Upload className="h-8 w-8 mx-auto text-primary-600 mb-2" />
+          <p className="font-medium">
+            {uploading ? 'Uploading…' : 'Drag & drop photos here'}
+          </p>
+          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+            or click to browse · JPG, PNG, WebP, HEIC · up to 20 files · max 15MB each
+          </p>
+        </button>
       )}
 
       {/* Photo grid */}
@@ -410,18 +514,24 @@ export function GalleryPage({ isOwnerView = false }: Props) {
           ))}
         </div>
       ) : photos.length === 0 ? (
-        <div className="text-center py-20 border rounded-2xl">
+        <div className="text-center py-16 border rounded-2xl">
           <ImageIcon className="h-12 w-12 mx-auto text-[hsl(var(--muted-foreground))] mb-4" />
           <h3 className="text-lg font-medium mb-2">
             {showTrash ? 'Trash is empty' : 'No photos yet'}
           </h3>
-          <p className="text-[hsl(var(--muted-foreground))]">
+          <p className="text-[hsl(var(--muted-foreground))] mb-4">
             {showTrash
               ? 'Deleted photos will appear here for recovery.'
               : isOwnerView
-                ? 'Upload some photos to get started.'
+                ? 'Drag & drop images above, or click Upload to add photos.'
                 : 'Check back later.'}
           </p>
+          {isOwnerView && !showTrash && (
+            <Button disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4" />
+              Choose photos
+            </Button>
+          )}
         </div>
       ) : (
         <div className="photo-grid">

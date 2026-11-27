@@ -2,7 +2,7 @@ const archiver = require('archiver');
 const https = require('https');
 const http = require('http');
 const { query } = require('../config/database');
-const { uploadToCloudinary, deleteFromCloudinary, getThumbnailUrl } = require('../config/cloudinary');
+const { uploadToCloudinary, deleteFromCloudinary, getThumbnailUrl, getWatermarkedUrl } = require('../config/cloudinary');
 
 const uploadPhotos = async (req, res) => {
   try {
@@ -390,7 +390,9 @@ const bulkDownload = async (req, res) => {
     let photos;
     if (Array.isArray(ids) && ids.length > 0) {
       const result = await query(
-        `SELECT p.id, p.file_name, p.image_url, p.public_id, g.owner_id, g.visibility
+        `SELECT p.id, p.file_name, p.image_url, p.public_id, g.owner_id, g.visibility,
+                g.watermark_enabled, g.watermark_text, g.watermark_logo_public_id,
+                g.watermark_position, g.watermark_opacity
          FROM photos p
          JOIN galleries g ON g.id = p.gallery_id
          WHERE p.id = ANY($1::uuid[]) AND p.is_deleted = FALSE`,
@@ -399,7 +401,9 @@ const bulkDownload = async (req, res) => {
       photos = result.rows;
     } else if (galleryId) {
       const result = await query(
-        `SELECT p.id, p.file_name, p.image_url, p.public_id, g.owner_id, g.visibility
+        `SELECT p.id, p.file_name, p.image_url, p.public_id, g.owner_id, g.visibility,
+                g.watermark_enabled, g.watermark_text, g.watermark_logo_public_id,
+                g.watermark_position, g.watermark_opacity
          FROM photos p
          JOIN galleries g ON g.id = p.gallery_id
          WHERE p.gallery_id = $1 AND p.is_deleted = FALSE
@@ -458,7 +462,8 @@ const bulkDownload = async (req, res) => {
 
     for (const photo of photos) {
       try {
-        const buffer = await fetchImage(photo.image_url);
+        const url = getWatermarkedUrl(photo.public_id, photo) || photo.image_url;
+        const buffer = await fetchImage(url);
         let name = photo.file_name || `${photo.id}.jpg`;
         // Avoid duplicate names in zip
         if (usedNames.has(name)) {
@@ -545,10 +550,42 @@ const getFavorites = async (req, res) => {
 const trackDownload = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const result = await query(
+      `SELECT p.public_id, p.image_url, p.file_name, p.is_deleted,
+              g.owner_id, g.visibility,
+              g.watermark_enabled, g.watermark_text, g.watermark_logo_public_id,
+              g.watermark_position, g.watermark_opacity
+       FROM photos p
+       JOIN galleries g ON g.id = p.gallery_id
+       WHERE p.id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0 || result.rows[0].is_deleted) {
+      return res.status(404).json({ success: false, message: 'Photo not found' });
+    }
+
+    const row = result.rows[0];
+    if (row.visibility === 'private' && (!req.user || req.user.id !== row.owner_id)) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     await query('UPDATE photos SET downloads = downloads + 1 WHERE id = $1', [id]);
-    res.json({ success: true });
+
+    const downloadUrl = getWatermarkedUrl(row.public_id, row) || row.image_url;
+
+    res.json({
+      success: true,
+      data: {
+        url: downloadUrl,
+        file_name: row.file_name,
+        watermarked: !!row.watermark_enabled,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error('Track download error:', error);
+    res.status(500).json({ success: false, message: 'Download failed' });
   }
 };
 

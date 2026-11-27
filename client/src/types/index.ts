@@ -10,6 +10,15 @@ export interface User {
 
 export type GalleryVisibility = 'public' | 'private' | 'password'
 
+export type WatermarkPosition =
+  | 'south_east'
+  | 'south_west'
+  | 'north_east'
+  | 'north_west'
+  | 'south'
+  | 'north'
+  | 'center'
+
 export interface Gallery {
   id: string
   owner_id: string
@@ -25,6 +34,12 @@ export interface Gallery {
   created_at: string
   updated_at?: string
   owner_name?: string
+  watermark_enabled?: boolean
+  watermark_text?: string | null
+  watermark_logo_url?: string | null
+  watermark_logo_public_id?: string | null
+  watermark_position?: WatermarkPosition | string | null
+  watermark_opacity?: number | null
 }
 
 export interface Photo {

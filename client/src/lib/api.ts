@@ -11,6 +11,10 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // Let the browser set multipart boundary for FormData uploads
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
   return config
 })
 
@@ -52,8 +56,13 @@ export const galleryApi = {
   getBySlug: (slug: string) => api.get<ApiResponse<{ gallery: Gallery }>>(`/galleries/slug/${slug}`),
   unlock: (slug: string, password: string) =>
     api.post<ApiResponse<{ gallery: Gallery }>>(`/galleries/slug/${slug}/unlock`, { password }),
-  update: (id: string, data: Partial<Gallery> & { password?: string }) =>
+  update: (id: string, data: Partial<Gallery> & { password?: string; clear_watermark_logo?: boolean }) =>
     api.put<ApiResponse<{ gallery: Gallery }>>(`/galleries/${id}`, data),
+  uploadWatermarkLogo: (id: string, file: File) => {
+    const form = new FormData()
+    form.append('logo', file)
+    return api.post<ApiResponse<{ gallery: Gallery }>>(`/galleries/${id}/watermark-logo`, form)
+  },
   delete: (id: string) => api.delete(`/galleries/${id}`),
   stats: () => api.get<ApiResponse<DashboardStats>>('/galleries/stats'),
   trackShare: (id: string, platform: string) =>
@@ -67,7 +76,6 @@ export const photoApi = {
     form.append('galleryId', galleryId)
     files.forEach((f) => form.append('photos', f))
     return api.post<ApiResponse<{ photos: Photo[] }>>('/photos/upload', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         if (onProgress && e.total) {
           onProgress(Math.round((e.loaded * 100) / e.total))
@@ -84,7 +92,8 @@ export const photoApi = {
   toggleFavorite: (id: string) =>
     api.post<ApiResponse<{ favorited: boolean }>>(`/photos/${id}/favorite`),
   favorites: () => api.get<ApiResponse<{ photos: Photo[] }>>('/photos/favorites'),
-  trackDownload: (id: string) => api.post(`/photos/${id}/download`),
+  trackDownload: (id: string) =>
+    api.post<ApiResponse<{ url: string; file_name: string; watermarked?: boolean }>>(`/photos/${id}/download`),
   bulkDelete: (ids: string[]) => api.post<ApiResponse<{ deleted: number }>>('/photos/bulk-delete', { ids }),
   purge: (ids: string[]) => api.post<ApiResponse<{ purged: number }>>('/photos/purge', { ids }),
   restore: (ids: string[]) => api.post<ApiResponse<{ restored: number }>>('/photos/restore', { ids }),
