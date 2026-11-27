@@ -559,44 +559,49 @@ export function GalleryPage({ isOwnerView = false }: Props) {
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
                 loading="lazy"
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-2 opacity-0 group-hover:opacity-100">
-                {!selectMode && !showTrash && (
-                  <div className="flex gap-1 ml-auto">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFavorite(photo.id)
-                      }}
-                      className={cn(
-                        'p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70',
-                        photo.is_favorited && 'text-red-400'
-                      )}
-                    >
-                      <Heart className={cn('h-4 w-4', photo.is_favorited && 'fill-current')} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        downloadPhoto(photo)
-                      }}
-                      className="p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70"
-                    >
-                      <Download className="h-4 w-4" />
-                    </button>
-                    {isOwnerView && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteOne(photo.id)
-                        }}
-                        className="p-1.5 rounded-full bg-black/50 text-white hover:bg-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+              {/* Always visible on mobile; hover-reveal on desktop */}
+              {!selectMode && !showTrash && (
+                <div className="absolute inset-x-0 bottom-0 flex items-end justify-end gap-1.5 p-2 bg-gradient-to-t from-black/55 via-black/20 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    aria-label="Favorite"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleFavorite(photo.id)
+                    }}
+                    className={cn(
+                      'p-2 rounded-full bg-black/55 text-white active:scale-95 touch-manipulation',
+                      photo.is_favorited && 'text-red-400'
                     )}
-                  </div>
-                )}
-              </div>
+                  >
+                    <Heart className={cn('h-4 w-4', photo.is_favorited && 'fill-current')} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Download"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      downloadPhoto(photo)
+                    }}
+                    className="p-2 rounded-full bg-black/55 text-white active:scale-95 touch-manipulation"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                  {isOwnerView && (
+                    <button
+                      type="button"
+                      aria-label="Delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteOne(photo.id)
+                      }}
+                      className="p-2 rounded-full bg-black/55 text-white active:scale-95 touch-manipulation"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
               {selectMode && (
                 <div className="absolute top-2 left-2">
                   <div
@@ -624,30 +629,72 @@ export function GalleryPage({ isOwnerView = false }: Props) {
       {lightboxIndex !== null && photos[lightboxIndex] && (
         <div className="fixed inset-0 z-50 bg-black/95 lightbox-overlay flex items-center justify-center">
           <button
+            type="button"
             onClick={() => setLightboxIndex(null)}
-            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white z-10"
+            className="absolute top-4 right-4 p-2.5 text-white/90 z-10 touch-manipulation"
+            aria-label="Close"
           >
             <X className="h-8 w-8" />
           </button>
           <button
+            type="button"
             onClick={() => setLightboxIndex((lightboxIndex - 1 + photos.length) % photos.length)}
-            className="absolute left-4 p-2 text-white/80 hover:text-white z-10"
+            className="absolute left-2 md:left-4 p-2 text-white/90 z-10 touch-manipulation"
+            aria-label="Previous"
           >
             <ChevronLeft className="h-10 w-10" />
           </button>
           <button
+            type="button"
             onClick={() => setLightboxIndex((lightboxIndex + 1) % photos.length)}
-            className="absolute right-4 p-2 text-white/80 hover:text-white z-10"
+            className="absolute right-2 md:right-4 p-2 text-white/90 z-10 touch-manipulation"
+            aria-label="Next"
           >
             <ChevronRight className="h-10 w-10" />
           </button>
           <img
             src={photos[lightboxIndex].image_url}
             alt={photos[lightboxIndex].file_name}
-            className="max-h-[90vh] max-w-[90vw] object-contain"
+            className="max-h-[82vh] max-w-[94vw] object-contain"
           />
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-sm">
-            {lightboxIndex + 1} / {photos.length}
+          <div className="absolute bottom-0 inset-x-0 pb-safe">
+            <div className="flex items-center justify-center gap-3 px-4 py-4 bg-gradient-to-t from-black/80 to-transparent">
+              <span className="text-white/80 text-sm tabular-nums min-w-[4.5rem] text-center">
+                {lightboxIndex + 1} / {photos.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => toggleFavorite(photos[lightboxIndex].id)}
+                className={cn(
+                  'inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/15 text-white text-sm font-medium touch-manipulation active:scale-95',
+                  photos[lightboxIndex].is_favorited && 'text-red-400'
+                )}
+              >
+                <Heart className={cn('h-4 w-4', photos[lightboxIndex].is_favorited && 'fill-current')} />
+                Favorite
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadPhoto(photos[lightboxIndex])}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary-600 text-white text-sm font-medium touch-manipulation active:scale-95"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </button>
+              {isOwnerView && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = photos[lightboxIndex].id
+                    handleDeleteOne(id)
+                    setLightboxIndex(null)
+                  }}
+                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-full bg-white/15 text-white text-sm font-medium touch-manipulation active:scale-95"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
