@@ -86,11 +86,19 @@ export function GalleryPage({ isOwnerView = false }: Props) {
     }
   }
 
+  const isSupportedImage = (f: File) => {
+    const type = (f.type || '').toLowerCase()
+    const name = (f.name || '').toLowerCase()
+    if (type.startsWith('image/')) return true
+    // iOS often omits MIME for HEIC — allow by extension
+    return /\.(jpe?g|png|webp|gif|heic|heif|hif|avif|tiff?|dng)$/i.test(name)
+  }
+
   const handleUpload = async (files: FileList | File[] | null) => {
     if (!files || !gallery || !isOwnerView) return
-    const fileArr = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    const fileArr = Array.from(files).filter(isSupportedImage)
     if (fileArr.length === 0) {
-      toast.error('Please select image files (JPG, PNG, WebP, HEIC)')
+      toast.error('Please select image files (JPG, PNG, WebP, HEIC/HEIF from iPhone)')
       return
     }
     if (fileArr.length > 20) {
@@ -351,7 +359,7 @@ export function GalleryPage({ isOwnerView = false }: Props) {
           <div className="rounded-2xl border-2 border-dashed border-primary-600 bg-[hsl(var(--card))] px-10 py-12 text-center shadow-xl">
             <Upload className="h-12 w-12 mx-auto text-primary-600 mb-3" />
             <p className="text-lg font-semibold">Drop photos to upload</p>
-            <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">JPG, PNG, WebP · up to 20 files</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">JPG, PNG, WebP, HEIC · up to 20 files</p>
           </div>
         </div>
       )}
@@ -380,7 +388,7 @@ export function GalleryPage({ isOwnerView = false }: Props) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif"
+                accept="image/*,.heic,.heif,.hif,.jpg,.jpeg,.png,.webp,.avif,image/heic,image/heif,image/heic-sequence,image/heif-sequence"
                 multiple
                 className="hidden"
                 onChange={(e) => handleUpload(e.target.files)}
@@ -501,7 +509,7 @@ export function GalleryPage({ isOwnerView = false }: Props) {
             {uploading ? 'Uploading…' : 'Drag & drop photos here'}
           </p>
           <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
-            or click to browse · JPG, PNG, WebP, HEIC · up to 20 files · max 15MB each
+            or click to browse · JPG, PNG, WebP, HEIC/HEIF (iPhone) · up to 20 files · max 25MB each
           </p>
         </button>
       )}
